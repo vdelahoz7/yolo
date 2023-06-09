@@ -15,8 +15,6 @@ ZONE = np.array([
 ])
 
 def get_center(bbox):
-    #xmin, ymin, xmax, ymax
-    # 0     1     2     3
 
     center = ((bbox[0] + bbox[2]) // 2, (bbox[1] + bbox[3]) // 2)
     return center

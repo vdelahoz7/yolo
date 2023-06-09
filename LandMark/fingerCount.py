@@ -9,7 +9,6 @@ mp_drawing_styles = mp.solutions.drawing_styles
 def finger_count():
     cap = cv2.VideoCapture(1)
 
-     # Initialize holistic model
     holistic = mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
     while cap.isOpened():
@@ -18,15 +17,11 @@ def finger_count():
         if not status:
             break
 
-        # Transform frame
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Inference
         results = holistic.process(rgb_frame)
 
-        # Left Hand
         mp_drawing.draw_landmarks(frame, results.left_hand_landmarks, mp_holistic.HAND_CONNECTIONS)
-        # Right Hand
         mp_drawing.draw_landmarks(frame, results.right_hand_landmarks, mp_holistic.HAND_CONNECTIONS)
 
         if results.left_hand_landmarks or results.right_hand_landmarks:
@@ -40,7 +35,6 @@ def finger_count():
 
             cv2.putText(frame, "Fingers: " + str(fingers), (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 255, 0), 3)
         
-        # Display
         cv2.imshow("frame", frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -63,7 +57,6 @@ def count_valid_fingers(hand_landmarks):
     wrist_landmark = hand_landmarks[0]
     finger_count = 0
 
-    # Check if thumb is up
     thumb_wrist_distance = calculate_distance(hand_landmarks[4], wrist_landmark)
     if thumb_wrist_distance > 0.25:
         finger_count += 1

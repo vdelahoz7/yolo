@@ -28,7 +28,6 @@ if __name__ == '__main__':
                 cv2.putText(img=frame, text=f"Id: {track_id}", org=(xmin, ymin-10), fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=2, color=(0,255,0), thickness=2)
                 cv2.rectangle(img=frame, pt1=(xmin, ymin), pt2=(xmax, ymax), color=(0, 255, 0), thickness=2)
 
-        # frame = results[0].plot()
 
         cv2.imshow("frame", frame)
 

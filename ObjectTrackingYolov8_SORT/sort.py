@@ -1,20 +1,3 @@
-"""
-    SORT: A Simple, Online and Realtime Tracker
-    Copyright (C) 2016-2020 Alex Bewley alex@bewley.ai
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
 from __future__ import print_function
 
 import os
@@ -28,7 +11,7 @@ def linear_assignment(cost_matrix):
   try:
     import lap
     _, x, y = lap.lapjv(cost_matrix, extend_cost=True)
-    return np.array([[y[i],i] for i in x if i >= 0]) #
+    return np.array([[y[i],i] for i in x if i >= 0])
   except ImportError:
     from scipy.optimize import linear_sum_assignment
     x, y = linear_sum_assignment(cost_matrix)
@@ -36,9 +19,6 @@ def linear_assignment(cost_matrix):
 
 
 def iou_batch(bb_test, bb_gt):
-  """
-  From SORT: Computes IOU between two bboxes in the form [x1,y1,x2,y2]
-  """
   bb_gt = np.expand_dims(bb_gt, 0)
   bb_test = np.expand_dims(bb_test, 1)
   
@@ -55,25 +35,16 @@ def iou_batch(bb_test, bb_gt):
 
 
 def convert_bbox_to_z(bbox):
-  """
-  Takes a bounding box in the form [x1,y1,x2,y2] and returns z in the form
-    [x,y,s,r] where x,y is the centre of the box and s is the scale/area and r is
-    the aspect ratio
-  """
   w = bbox[2] - bbox[0]
   h = bbox[3] - bbox[1]
   x = bbox[0] + w/2.
   y = bbox[1] + h/2.
-  s = w * h    #scale is just area
+  s = w * h
   r = w / float(h)
   return np.array([x, y, s, r]).reshape((4, 1))
 
 
 def convert_x_to_bbox(x,score=None):
-  """
-  Takes a bounding box in the centre form [x,y,s,r] and returns it in the form
-    [x1,y1,x2,y2] where x1,y1 is the top left and x2,y2 is the bottom right
-  """
   w = np.sqrt(x[2] * x[3])
   h = x[2] / w
   if(score==None):
@@ -83,21 +54,14 @@ def convert_x_to_bbox(x,score=None):
 
 
 class KalmanBoxTracker(object):
-  """
-  This class represents the internal state of individual tracked objects observed as bbox.
-  """
   count = 0
   def __init__(self,bbox):
-    """
-    Initialises a tracker using initial bounding box.
-    """
-    #define constant velocity model
     self.kf = KalmanFilter(dim_x=7, dim_z=4) 
     self.kf.F = np.array([[1,0,0,0,1,0,0],[0,1,0,0,0,1,0],[0,0,1,0,0,0,1],[0,0,0,1,0,0,0],  [0,0,0,0,1,0,0],[0,0,0,0,0,1,0],[0,0,0,0,0,0,1]])
     self.kf.H = np.array([[1,0,0,0,0,0,0],[0,1,0,0,0,0,0],[0,0,1,0,0,0,0],[0,0,0,1,0,0,0]])
 
     self.kf.R[2:,2:] *= 10.
-    self.kf.P[4:,4:] *= 1000. #give high uncertainty to the unobservable initial velocities
+    self.kf.P[4:,4:] *= 1000.
     self.kf.P *= 10.
     self.kf.Q[-1,-1] *= 0.01
     self.kf.Q[4:,4:] *= 0.01
@@ -112,9 +76,6 @@ class KalmanBoxTracker(object):
     self.age = 0
 
   def update(self,bbox):
-    """
-    Updates the state vector with observed bbox.
-    """
     self.time_since_update = 0
     self.history = []
     self.hits += 1
@@ -122,9 +83,6 @@ class KalmanBoxTracker(object):
     self.kf.update(convert_bbox_to_z(bbox))
 
   def predict(self):
-    """
-    Advances the state vector and returns the predicted bounding box estimate.
-    """
     if((self.kf.x[6]+self.kf.x[2])<=0):
       self.kf.x[6] *= 0.0
     self.kf.predict()
@@ -136,18 +94,10 @@ class KalmanBoxTracker(object):
     return self.history[-1]
 
   def get_state(self):
-    """
-    Returns the current bounding box estimate.
-    """
     return convert_x_to_bbox(self.kf.x)
 
 
 def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
-  """
-  Assigns detections to tracked object (both represented as bounding boxes)
-
-  Returns 3 lists of matches, unmatched_detections and unmatched_trackers
-  """
   if(len(trackers)==0):
     return np.empty((0,2),dtype=int), np.arange(len(detections)), np.empty((0,5),dtype=int)
 
@@ -171,7 +121,6 @@ def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
     if(t not in matched_indices[:,1]):
       unmatched_trackers.append(t)
 
-  #filter out matched with low IOU
   matches = []
   for m in matched_indices:
     if(iou_matrix[m[0], m[1]]<iou_threshold):
@@ -189,9 +138,6 @@ def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
 
 class Sort(object):
   def __init__(self, max_age=1, min_hits=3, iou_threshold=0.3):
-    """
-    Sets key parameters for SORT
-    """
     self.max_age = max_age
     self.min_hits = min_hits
     self.iou_threshold = iou_threshold
@@ -199,16 +145,8 @@ class Sort(object):
     self.frame_count = 0
 
   def update(self, dets=np.empty((0, 5))):
-    """
-    Params:
-      dets - a numpy array of detections in the format [[x1,y1,x2,y2,score],[x1,y1,x2,y2,score],...]
-    Requires: this method must be called once for each frame even with empty detections (use np.empty((0, 5)) for frames without detections).
-    Returns the a similar array, where the last column is the object ID.
 
-    NOTE: The number of objects returned may differ from the number of detections provided.
-    """
     self.frame_count += 1
-    # get predicted locations from existing trackers.
     trks = np.zeros((len(self.trackers), 5))
     to_del = []
     ret = []
@@ -222,11 +160,9 @@ class Sort(object):
       self.trackers.pop(t)
     matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets,trks, self.iou_threshold)
 
-    # update matched trackers with assigned detections
     for m in matched:
       self.trackers[m[1]].update(dets[m[0], :])
 
-    # create and initialise new trackers for unmatched detections
     for i in unmatched_dets:
         trk = KalmanBoxTracker(dets[i,:])
         self.trackers.append(trk)
@@ -234,9 +170,8 @@ class Sort(object):
     for trk in reversed(self.trackers):
         d = trk.get_state()[0]
         if (trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits):
-          ret.append(np.concatenate((d,[trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
+          ret.append(np.concatenate((d,[trk.id+1])).reshape(1,-1))
         i -= 1
-        # remove dead tracklet
         if(trk.time_since_update > self.max_age):
           self.trackers.pop(i)
     if(len(ret)>0):
